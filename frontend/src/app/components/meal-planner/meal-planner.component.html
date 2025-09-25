@@ -1,0 +1,138 @@
+<section class="planner" *ngIf="!loading; else loadingState">
+  <div class="planner-panel">
+    <h2>Create a fresh weekly plan</h2>
+    <form (ngSubmit)="generatePlan()" class="planner-form">
+      <label>
+        <span>Start week on</span>
+        <input type="date" [formControl]="plannerForm.controls.startDate" />
+      </label>
+      <div class="highlight-selector">
+        <div class="selector-header">
+          <span>Prioritise recipes ({{ highlightCount }})</span>
+          <small>Select favourites to encourage the planner to schedule them sooner.</small>
+        </div>
+        <div class="highlight-grid">
+          <ng-container *ngFor="let type of mealTypes">
+            <div class="highlight-column">
+              <h4 class="type-heading">{{ type | titlecase }}</h4>
+              <ul>
+                <li *ngFor="let recipe of recipesByType(type)">
+                  <label class="highlight-option">
+                    <input
+                      type="checkbox"
+                      [checked]="isRecipeHighlighted(recipe)"
+                      (change)="toggleHighlight(recipe)"
+                    />
+                    <span>
+                      {{ recipe.name }}
+                      <small>
+                        {{ recipe.prepTimeMinutes }} min · Serves {{ recipe.servings }}
+                      </small>
+                    </span>
+                  </label>
+                </li>
+              </ul>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+      <button type="submit" [disabled]="generating" class="primary-btn">
+        {{ generating ? 'Planning…' : 'Generate weekly plan' }}
+      </button>
+      <p class="helper-text">
+        Tip: run <code>npm run seed</code> in the backend project to pre-load recipes and
+        ingredients.
+      </p>
+    </form>
+  </div>
+
+  <div class="planner-results" *ngIf="hasPlan; else emptyState">
+    <section class="plan-overview">
+      <header>
+        <h2>Weekly menu</h2>
+        <div class="plan-dates">
+          <span>{{ plan?.startDate | date: 'longDate' }}</span>
+          <span>→</span>
+          <span>{{ plan?.endDate | date: 'longDate' }}</span>
+        </div>
+        <p class="plan-generated" *ngIf="planGeneratedAt">
+          Generated {{ planGeneratedAt }}
+        </p>
+      </header>
+      <div class="days-grid">
+        <article class="day-card" *ngFor="let day of sortedDays; trackBy: trackByDate">
+          <h3>{{ formatDate(day.date) }}</h3>
+          <ul>
+            <li *ngFor="let type of mealTypes">
+              <div class="meal-type">{{ type | titlecase }}</div>
+              <div class="meal-details">
+                <strong>{{ day.meals[type]?.recipeName }}</strong>
+                <small *ngIf="recipeForMeal(day, type) as recipe">
+                  {{ recipe.prepTimeMinutes }} min · Serves {{ recipe.servings }}
+                </small>
+              </div>
+            </li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="grocery-section" *ngIf="groceryList">
+      <header>
+        <h2>Smart grocery list</h2>
+        <p>
+          Estimated spend: <strong>{{ groceryList.totalCost | currency }}</strong>
+          <span *ngIf="groceryList.potentialSavings > 0">
+            · Potential savings up to
+            <strong>{{ groceryList.potentialSavings | currency }}</strong> with suggested swaps
+          </span>
+        </p>
+      </header>
+      <div class="grocery-table">
+        <div class="grocery-row grocery-header">
+          <span>Ingredient</span>
+          <span>Quantity</span>
+          <span>Estimated cost</span>
+          <span>Cheaper swap</span>
+        </div>
+        <div class="grocery-row" *ngFor="let item of groceryList.items">
+          <span>
+            <strong>{{ item.ingredient.name }}</strong>
+            <small class="category">{{ item.ingredient.category | titlecase }}</small>
+          </span>
+          <span>{{ item.totalQuantity | number: '1.0-2' }} {{ item.unit }}</span>
+          <span>{{ item.estimatedCost | currency }}</span>
+          <span *ngIf="item.substitution; else noSwap">
+            <div class="swap-suggestion">
+              <strong>{{ item.substitution?.name }}</strong>
+              <small>
+                Save approx. {{ item.potentialSavings || 0 | currency }} ({{
+                  item.substitution?.pricePerUnit | currency
+                }}/{{ item.substitution?.unit }})
+              </small>
+            </div>
+          </span>
+          <ng-template #noSwap>
+            <span class="no-swap">Best price found</span>
+          </ng-template>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+
+<ng-template #loadingState>
+  <div class="state state--loading">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Loading your saved meal plan…</p>
+  </div>
+</ng-template>
+
+<ng-template #emptyState>
+  <div class="state state--empty">
+    <h2>No plan yet</h2>
+    <p>Use the planner form to generate your first schedule and shopping list.</p>
+  </div>
+</ng-template>
+
+<p class="state state--error" *ngIf="errorMessage">{{ errorMessage }}</p>
